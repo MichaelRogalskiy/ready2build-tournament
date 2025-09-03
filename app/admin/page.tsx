@@ -5,25 +5,17 @@ import Link from 'next/link';
 
 export default function AdminPage() {
   const [title, setTitle] = useState('');
-  const [csvFile, setCsvFile] = useState<File | null>(null);
   const [rounds, setRounds] = useState(3);
   const [groupSize, setGroupSize] = useState(5);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ tournamentId: string; managersCount: number; bossesCount: number; message: string } | null>(null);
   const [error, setError] = useState('');
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setCsvFile(file);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title || !csvFile) {
-      setError('Будь ласка, заповніть всі поля');
+    if (!title) {
+      setError('Будь ласка, введіть назву турніру');
       return;
     }
     
@@ -32,15 +24,14 @@ export default function AdminPage() {
     setResult(null);
     
     try {
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('csv', csvFile);
-      formData.append('rounds', rounds.toString());
-      formData.append('groupSize', groupSize.toString());
-      
       const response = await fetch('/api/seed', {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          rounds,
+          groupSize
+        })
       });
       
       const data = await response.json();
@@ -48,7 +39,6 @@ export default function AdminPage() {
       if (response.ok) {
         setResult(data);
         setTitle('');
-        setCsvFile(null);
       } else {
         setError(data.error || 'Помилка створення турніру');
       }
@@ -82,21 +72,19 @@ export default function AdminPage() {
             />
           </div>
           
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label htmlFor="csv" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-              CSV файл з менеджерами:
-            </label>
-            <input
-              id="csv"
-              type="file"
-              accept=".csv"
-              onChange={handleFileChange}
-              required
-              style={{ display: 'block', width: '100%' }}
-            />
-            <small style={{ color: '#666' }}>
-              Очікувані колонки: ИНН, ФИО, ІПН лида, Лид для джира, Категория персонала
-            </small>
+          <div style={{ 
+            background: '#e3f2fd', 
+            color: '#1565c0', 
+            padding: '1rem', 
+            borderRadius: '8px', 
+            marginBottom: '1.5rem' 
+          }}>
+            <h4 style={{ marginBottom: '0.5rem' }}>📄 Файл менеджерів</h4>
+            <p style={{ fontSize: '0.9rem' }}>
+              Використовується файл <strong>&quot;List of managers.csv&quot;</strong> з корневої директорії проекту.
+              <br />
+              <small>Колонки: ИНН, ФИО, ІПН лида, Лид для джира, Категория персонала</small>
+            </p>
           </div>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -175,11 +163,11 @@ export default function AdminPage() {
         <div style={{ marginTop: '2rem', padding: '1rem', background: '#f5f5f5', borderRadius: '8px' }}>
           <h3 style={{ marginBottom: '1rem' }}>📋 Інструкція:</h3>
           <ol style={{ paddingLeft: '1.5rem' }}>
-            <li style={{ marginBottom: '0.5rem' }}>Підготуйте CSV файл з менеджерами</li>
+            <li style={{ marginBottom: '0.5rem' }}>Переконайтеся, що файл &quot;List of managers.csv&quot; є в корені проекту</li>
             <li style={{ marginBottom: '0.5rem' }}>Введіть назву турніру</li>
-            <li style={{ marginBottom: '0.5rem' }}>Завантажте файл та створіть турнір</li>
-            <li style={{ marginBottom: '0.5rem' }}>Поділіться ID турніру з босами</li>
-            <li>Боси зможуть почати оцінювання на головній сторінці</li>
+            <li style={{ marginBottom: '0.5rem' }}>Налаштуйте кількість раундів та розмір груп</li>
+            <li style={{ marginBottom: '0.5rem' }}>Створіть турнір - менеджери завантажуються автоматично</li>
+            <li>Боси зможуть одразу почати оцінювання на головній сторінці</li>
           </ol>
         </div>
       </div>

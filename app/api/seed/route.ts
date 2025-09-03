@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, initDatabase, seedBosses } from '@/lib/db';
 import { Manager, Tournament } from '@/lib/types';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse request body
-    const formData = await request.formData();
-    const title = formData.get('title') as string;
-    const csvFile = formData.get('csv') as File | string;
-    const rounds = Number(formData.get('rounds') || 3);
-    const groupSize = Number(formData.get('groupSize') || 5);
+    // Parse request body - now only need title, rounds, groupSize
+    const body = await request.json();
+    const title = body.title;
+    const rounds = Number(body.rounds || 3);
+    const groupSize = Number(body.groupSize || 5);
     
     if (!title) {
       return NextResponse.json(
@@ -32,12 +33,18 @@ export async function POST(request: NextRequest) {
     `;
     const tournament = tournamentResult.rows[0];
     
-    // Parse CSV
+    // Read CSV from local file
+    const csvPath = path.join(process.cwd(), 'List of managers.csv');
     let csvContent: string;
-    if (typeof csvFile === 'string') {
-      csvContent = csvFile;
-    } else {
-      csvContent = await csvFile.text();
+    
+    try {
+      csvContent = await fs.readFile(csvPath, 'utf-8');
+    } catch (error) {
+      console.error('Error reading CSV file:', error);
+      return NextResponse.json(
+        { error: 'CSV file not found. Make sure "List of managers.csv" exists in project root.' },
+        { status: 400 }
+      );
     }
     
     const lines = csvContent.split('\n').filter(line => line.trim());
