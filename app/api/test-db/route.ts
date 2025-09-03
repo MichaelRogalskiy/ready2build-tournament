@@ -4,6 +4,8 @@ import { sql } from '@/lib/db';
 export async function GET() {
   try {
     console.log('Testing database connection...');
+    console.log('Using connection string:', process.env.POSTGRES_URL ? 'POSTGRES_URL found' : 'No POSTGRES_URL');
+    console.log('Alternative:', process.env.POSTGRES_URL_NON_POOLING ? 'NON_POOLING available' : 'No NON_POOLING');
     
     // Test basic connection
     const result = await sql`SELECT 1 as test`;
