@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function AdminPage() {
   const [title, setTitle] = useState('');
@@ -184,9 +185,9 @@ export default function AdminPage() {
       </div>
       
       <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-        <a href="/" className="button secondary" style={{ display: 'inline-block', textDecoration: 'none' }}>
+        <Link href="/" className="button secondary" style={{ display: 'inline-block', textDecoration: 'none' }}>
           Повернутися на головну
-        </a>
+        </Link>
       </div>
     </div>
   );

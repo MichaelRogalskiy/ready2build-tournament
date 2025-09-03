@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const BOSSES = [
   'Михайло Рогальський',
@@ -85,9 +86,9 @@ export default function Home() {
       
       <div className="card" style={{ marginTop: '2rem' }}>
         <h2 style={{ marginBottom: '1rem' }}>🚀 Адмін: Створити новий турнір</h2>
-        <a href="/admin" className="button secondary" style={{ display: 'inline-block', textDecoration: 'none' }}>
+        <Link href="/admin" className="button secondary" style={{ display: 'inline-block', textDecoration: 'none' }}>
           Перейти до адмін-панелі
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 interface ManagerScore {
   managerId: string;
@@ -173,9 +174,9 @@ export default function ResultsPage() {
       </div>
       
       <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-        <a href="/" className="button secondary" style={{ display: 'inline-block', textDecoration: 'none' }}>
+        <Link href="/" className="button secondary" style={{ display: 'inline-block', textDecoration: 'none' }}>
           Повернутися на головну
-        </a>
+        </Link>
       </div>
     </div>
   );
