@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { sqlite } from '@/lib/db-sqlite';
 import { calculatePickScores, updateScores } from '@/lib/scoring';
 
 export async function POST(request: NextRequest) {
@@ -33,17 +33,17 @@ export async function POST(request: NextRequest) {
     }
     
     // Get group members to validate picks
-    const groupResult = await sql`
+    const groupResult = sqlite.query(`
       SELECT manager_id 
       FROM appearances
       WHERE 
-        tournament_id = ${tournamentId} AND
-        boss_id = ${bossId} AND
-        round_index = ${roundIndex} AND
-        group_index = ${groupIndex}
-    `;
+        tournament_id = ? AND
+        boss_id = ? AND
+        round_index = ? AND
+        group_index = ?
+    `, [tournamentId, bossId, roundIndex, groupIndex]);
     
-    const groupMemberIds = groupResult.rows.map(r => r.manager_id);
+    const groupMemberIds = (groupResult.rows as {manager_id: string}[]).map(r => r.manager_id);
     
     // Validate that picks are from the current group
     if (!groupMemberIds.includes(top1) || !groupMemberIds.includes(top2) || !groupMemberIds.includes(bottom1)) {
@@ -54,14 +54,14 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if pick already exists
-    const existingPick = await sql`
+    const existingPick = sqlite.query(`
       SELECT id FROM picks
       WHERE 
-        tournament_id = ${tournamentId} AND
-        boss_id = ${bossId} AND
-        round_index = ${roundIndex} AND
-        group_index = ${groupIndex}
-    `;
+        tournament_id = ? AND
+        boss_id = ? AND
+        round_index = ? AND
+        group_index = ?
+    `, [tournamentId, bossId, roundIndex, groupIndex]);
     
     if (existingPick.rows.length > 0) {
       return NextResponse.json(
@@ -71,15 +71,16 @@ export async function POST(request: NextRequest) {
     }
     
     // Save pick
-    await sql`
-      INSERT INTO picks (
-        tournament_id, boss_id, round_index, group_index,
-        top1, top2, bottom1, latency_ms
-      ) VALUES (
-        ${tournamentId}, ${bossId}, ${roundIndex}, ${groupIndex},
-        ${top1}, ${top2}, ${bottom1}, ${latencyMs || null}
-      )
-    `;
+    sqlite.insert('picks', {
+      tournament_id: tournamentId,
+      boss_id: bossId,
+      round_index: roundIndex,
+      group_index: groupIndex,
+      top1,
+      top2,
+      bottom1,
+      latency_ms: latencyMs || null
+    });
     
     // Calculate and update scores
     const pickScores = calculatePickScores(top1, top2, bottom1, groupMemberIds);

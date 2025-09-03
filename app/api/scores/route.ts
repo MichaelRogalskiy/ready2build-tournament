@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { sqlite } from '@/lib/db-sqlite';
 import { getManagerScoresForBoss, calculateAggregateScores } from '@/lib/scoring';
 
 export async function GET(request: NextRequest) {
@@ -15,13 +15,11 @@ export async function GET(request: NextRequest) {
     }
     
     // Get all bosses
-    const bossesResult = await sql`
-      SELECT id, name FROM bosses ORDER BY name
-    `;
+    const bossesResult = sqlite.select('bosses', undefined, 'name');
     
     // Get scores per boss
     const perBoss = await Promise.all(
-      bossesResult.rows.map(async (boss) => {
+      (bossesResult.rows as {id: string, name: string}[]).map(async (boss) => {
         const scores = await getManagerScoresForBoss(tournamentId, boss.id);
         return {
           bossId: boss.id,

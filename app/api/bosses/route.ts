@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { sqlite, initDatabase } from '@/lib/db-sqlite';
 
 export async function GET() {
   try {
-    const result = await sql`
-      SELECT id, name, email FROM bosses ORDER BY name
-    `;
+    // Auto-initialize database if needed
+    await initDatabase();
+    const result = sqlite.select('bosses', undefined, 'name');
     
     return NextResponse.json(result.rows);
   } catch (error) {

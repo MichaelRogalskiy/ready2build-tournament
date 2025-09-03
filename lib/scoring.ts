@@ -1,4 +1,4 @@
-import { sql } from './db';
+import { sqlite } from './db-sqlite';
 import { ManagerScore } from './types';
 
 export interface PickScores {
@@ -70,24 +70,17 @@ export async function updateScores(
   pickScores: PickScores
 ) {
   for (const [managerId, score] of Object.entries(pickScores)) {
-    await sql`
-      INSERT INTO scores (
+    // SQLite doesn't have ON CONFLICT with DO UPDATE, use INSERT OR REPLACE
+    sqlite.query(`
+      INSERT OR REPLACE INTO scores (
         tournament_id, boss_id, manager_id, round_index,
         points, wins, losses, top1_count, top2_count, bottom1_count
-      ) VALUES (
-        ${tournamentId}, ${bossId}, ${managerId}, ${roundIndex},
-        ${score.points}, ${score.wins}, ${score.losses},
-        ${score.isTop1 ? 1 : 0}, ${score.isTop2 ? 1 : 0}, ${score.isBottom1 ? 1 : 0}
-      )
-      ON CONFLICT (tournament_id, boss_id, manager_id, round_index)
-      DO UPDATE SET
-        points = EXCLUDED.points,
-        wins = EXCLUDED.wins,
-        losses = EXCLUDED.losses,
-        top1_count = EXCLUDED.top1_count,
-        top2_count = EXCLUDED.top2_count,
-        bottom1_count = EXCLUDED.bottom1_count
-    `;
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      tournamentId, bossId, managerId, roundIndex,
+      score.points, score.wins, score.losses,
+      score.isTop1 ? 1 : 0, score.isTop2 ? 1 : 0, score.isBottom1 ? 1 : 0
+    ]);
   }
 }
 
@@ -95,7 +88,7 @@ export async function getManagerScoresForBoss(
   tournamentId: string,
   bossId: string
 ): Promise<ManagerScore[]> {
-  const result = await sql`
+  const result = sqlite.query(`
     SELECT 
       m.id as manager_id,
       m.fio,
@@ -108,13 +101,13 @@ export async function getManagerScoresForBoss(
     FROM managers m
     LEFT JOIN scores s ON 
       s.manager_id = m.id AND 
-      s.tournament_id = ${tournamentId} AND
-      s.boss_id = ${bossId}
+      s.tournament_id = ? AND
+      s.boss_id = ?
     GROUP BY m.id, m.fio
     ORDER BY points DESC, wins DESC, losses ASC
-  `;
+  `, [tournamentId, bossId]);
   
-  return result.rows.map(row => ({
+  return (result.rows as {manager_id: string, fio: string, points: number, wins: number, losses: number, top1_count: number, top2_count: number, bottom1_count: number}[]).map((row) => ({
     managerId: row.manager_id,
     fio: row.fio,
     points: Number(row.points),
@@ -127,46 +120,79 @@ export async function getManagerScoresForBoss(
 }
 
 export async function calculateAggregateScores(tournamentId: string) {
-  const result = await sql`
-    WITH boss_scores AS (
-      SELECT 
-        s.manager_id,
-        s.boss_id,
-        SUM(s.points) as total_points,
-        SUM(s.top1_count) as top1_count,
-        SUM(s.bottom1_count) as bottom1_count
-      FROM scores s
-      WHERE s.tournament_id = ${tournamentId}
-      GROUP BY s.manager_id, s.boss_id
-    ),
-    aggregated AS (
-      SELECT 
-        m.id as manager_id,
-        m.fio,
-        AVG(bs.total_points) as avg_points,
-        STDDEV(bs.total_points) as stability,
-        SUM(bs.top1_count) as top1_total,
-        SUM(bs.bottom1_count) as bottom1_total
-      FROM managers m
-      LEFT JOIN boss_scores bs ON bs.manager_id = m.id
-      GROUP BY m.id, m.fio
-    )
-    SELECT * FROM aggregated
-    ORDER BY avg_points DESC, stability ASC, top1_total DESC, bottom1_total ASC
-  `;
+  // SQLite doesn't support STDDEV, we'll calculate it manually
+  // First get boss scores
+  const bossScoresResult = sqlite.query(`
+    SELECT 
+      s.manager_id,
+      s.boss_id,
+      SUM(s.points) as total_points,
+      SUM(s.top1_count) as top1_count,
+      SUM(s.bottom1_count) as bottom1_count
+    FROM scores s
+    WHERE s.tournament_id = ?
+    GROUP BY s.manager_id, s.boss_id
+  `, [tournamentId]);
+
+  // Group by manager and calculate aggregated scores
+  const managerScores: { [key: string]: {totalPoints: number[], top1Total: number, bottom1Total: number} } = {};
   
-  return result.rows.map(row => ({
-    managerId: row.manager_id,
-    fio: row.fio,
-    avgPoints: Number(row.avg_points) || 0,
-    stability: Number(row.stability) || 0,
-    top1Total: Number(row.top1_total) || 0,
-    bottom1Total: Number(row.bottom1_total) || 0,
-    tiebreak: {
-      sos: 0, // Strength of schedule - to be calculated
-      h2h: 0, // Head to head - to be calculated
-      top1: Number(row.top1_total) || 0,
-      bottom1: Number(row.bottom1_total) || 0
+  for (const row of (bossScoresResult.rows as {manager_id: string, boss_id: string, total_points: number, top1_count: number, bottom1_count: number}[])) {
+    const managerId = row.manager_id;
+    if (!managerScores[managerId]) {
+      managerScores[managerId] = {
+        totalPoints: [],
+        top1Total: 0,
+        bottom1Total: 0
+      };
     }
-  }));
+    
+    managerScores[managerId].totalPoints.push(Number(row.total_points));
+    managerScores[managerId].top1Total += Number(row.top1_count);
+    managerScores[managerId].bottom1Total += Number(row.bottom1_count);
+  }
+
+  // Get all managers with their FIO
+  const managersResult = sqlite.query('SELECT id, fio FROM managers');
+  
+  const aggregatedScores = (managersResult.rows as {id: string, fio: string}[]).map(manager => {
+    const scores = managerScores[manager.id];
+    let avgPoints = 0;
+    let stability = 0;
+    
+    if (scores && scores.totalPoints.length > 0) {
+      avgPoints = scores.totalPoints.reduce((a: number, b: number) => a + b, 0) / scores.totalPoints.length;
+      
+      // Calculate standard deviation manually
+      if (scores.totalPoints.length > 1) {
+        const variance = scores.totalPoints.reduce((acc: number, val: number) => {
+          return acc + Math.pow(val - avgPoints, 2);
+        }, 0) / scores.totalPoints.length;
+        stability = Math.sqrt(variance);
+      }
+    }
+    
+    return {
+      managerId: manager.id,
+      fio: manager.fio,
+      avgPoints,
+      stability,
+      top1Total: scores ? scores.top1Total : 0,
+      bottom1Total: scores ? scores.bottom1Total : 0,
+      tiebreak: {
+        sos: 0, // Strength of schedule - to be calculated
+        h2h: 0, // Head to head - to be calculated
+        top1: scores ? scores.top1Total : 0,
+        bottom1: scores ? scores.bottom1Total : 0
+      }
+    };
+  });
+
+  // Sort by average points descending, then stability ascending, etc.
+  return aggregatedScores.sort((a, b) => {
+    if (a.avgPoints !== b.avgPoints) return b.avgPoints - a.avgPoints;
+    if (a.stability !== b.stability) return a.stability - b.stability;
+    if (a.top1Total !== b.top1Total) return b.top1Total - a.top1Total;
+    return a.bottom1Total - b.bottom1Total;
+  });
 }

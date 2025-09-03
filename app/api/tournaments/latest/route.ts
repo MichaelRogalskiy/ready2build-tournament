@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { sqlite, initDatabase } from '@/lib/db-sqlite';
 
 export async function GET() {
   try {
-    const result = await sql`
+    // Auto-initialize database if needed
+    await initDatabase();
+    
+    const result = sqlite.query(`
       SELECT id, title, rounds, group_size, created_at 
       FROM tournaments 
       ORDER BY created_at DESC 
       LIMIT 1
-    `;
+    `);
     
     if (result.rows.length === 0) {
       return NextResponse.json(

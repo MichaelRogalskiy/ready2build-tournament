@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, initDatabase, seedBosses } from '@/lib/db';
+import { sqlite, initDatabase, seedBosses } from '@/lib/db-sqlite';
 import { Manager, Tournament } from '@/lib/types';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -9,17 +9,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log('=== Seed endpoint called ===');
     
-    // Check environment variables first
-    if (!process.env.POSTGRES_URL && !process.env.POSTGRES_PRISMA_URL) {
-      console.error('No database URL found in environment variables');
-      return NextResponse.json({
-        error: 'Database not configured',
-        details: 'No POSTGRES_URL or POSTGRES_PRISMA_URL found',
-        suggestion: 'Make sure Vercel Postgres is connected to your project'
-      }, { status: 500 });
-    }
-    
-    console.log('Database URL configured:', !!process.env.POSTGRES_URL);
+    console.log('Using SQLite file-based database');
     
     // Parse request body - now only need title, rounds, groupSize
     const body = await request.json();
@@ -48,12 +38,12 @@ export async function POST(request: NextRequest) {
     
     console.log('Creating tournament...');
     // Create tournament
-    const tournamentResult = await sql<Tournament>`
-      INSERT INTO tournaments (title, rounds, group_size)
-      VALUES (${title}, ${rounds}, ${groupSize})
-      RETURNING *
-    `;
-    const tournament = tournamentResult.rows[0];
+    const tournamentResult = sqlite.insert('tournaments', {
+      title,
+      rounds,
+      group_size: groupSize
+    });
+    const tournament = tournamentResult.rows[0] as Tournament;
     console.log('Tournament created:', tournament.id);
     
     // Read CSV from local file
@@ -115,19 +105,15 @@ export async function POST(request: NextRequest) {
       console.log(`Processing manager ${i}: ${fio}`);
       
       try {
-        const managerResult = await sql<Manager>`
-          INSERT INTO managers (inn, fio, lead_tin, lead_for_jira, staff_category)
-          VALUES (
-            ${values[headerMap['ИНН']] || null},
-            ${fio},
-            ${values[headerMap['ІПН лида']] || null},
-            ${values[headerMap['Лид для джира']] || null},
-            ${values[headerMap['Категория персонала']] || null}
-          )
-          RETURNING *
-        `;
+        const managerResult = sqlite.insert('managers', {
+          inn: values[headerMap['ИНН']] || null,
+          fio,
+          lead_tin: values[headerMap['ІПН лида']] || null,
+          lead_for_jira: values[headerMap['Лид для джира']] || null,
+          staff_category: values[headerMap['Категория персонала']] || null
+        });
         
-        managers.push(managerResult.rows[0]);
+        managers.push(managerResult.rows[0] as Manager);
       } catch (error) {
         console.error(`Error inserting manager ${fio}:`, error);
         throw error;
@@ -150,19 +136,11 @@ export async function POST(request: NextRequest) {
     
     // Check if it's a database connection error
     if (error instanceof Error) {
-      if (error.message.includes('connect') || error.message.includes('ECONNREFUSED')) {
+      if (error.message.includes('SQLITE_') || error.message.includes('database')) {
         return NextResponse.json({
-          error: 'Database connection failed',
+          error: 'SQLite database error',
           details: error.message,
-          suggestion: 'Check if Vercel Postgres is properly connected'
-        }, { status: 500 });
-      }
-      
-      if (error.message.includes('does not exist') || error.message.includes('relation')) {
-        return NextResponse.json({
-          error: 'Database schema error',
-          details: error.message,
-          suggestion: 'Database tables may not be created properly'
+          suggestion: 'Check SQLite database file permissions and structure'
         }, { status: 500 });
       }
     }

@@ -70,10 +70,10 @@ export async function getWasTogetherFunction(
   bossId: string,
   currentRound: number
 ): Promise<(a: string, b: string) => boolean> {
-  const { sql } = await import('./db');
+  const { sqlite } = await import('./db-sqlite');
   
   // Get all previous appearances for this boss in this tournament
-  const result = await sql`
+  const result = sqlite.query(`
     SELECT DISTINCT a1.manager_id as m1, a2.manager_id as m2
     FROM appearances a1
     JOIN appearances a2 ON 
@@ -83,13 +83,13 @@ export async function getWasTogetherFunction(
       a1.group_index = a2.group_index AND
       a1.manager_id < a2.manager_id
     WHERE 
-      a1.tournament_id = ${tournamentId} AND
-      a1.boss_id = ${bossId} AND
-      a1.round_index < ${currentRound}
-  `;
+      a1.tournament_id = ? AND
+      a1.boss_id = ? AND
+      a1.round_index < ?
+  `, [tournamentId, bossId, currentRound]);
   
   const pairs = new Set<string>();
-  for (const row of result.rows) {
+  for (const row of (result.rows as {m1: string, m2: string}[])) {
     pairs.add(`${row.m1}|${row.m2}`);
     pairs.add(`${row.m2}|${row.m1}`);
   }

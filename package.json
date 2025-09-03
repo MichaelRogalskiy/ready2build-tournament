@@ -9,7 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@vercel/postgres": "^0.10.0",
+    "better-sqlite3": "^12.2.0",
     "next": "15.5.2",
     "react": "19.1.0",
     "react-dom": "19.1.0"
