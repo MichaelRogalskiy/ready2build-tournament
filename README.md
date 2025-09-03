@@ -1,36 +1,115 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏆 Tournament Ranking System (Swiss)
 
-## Getting Started
+Swiss tournament system for manager evaluation with Top-1/Top-2/Bottom-1 selection.
 
-First, run the development server:
+## 🎯 Features
+
+- **Swiss Tournament System**: Strong players face strong opponents, weak face weak
+- **Simple Selection**: Choose Top-1, Top-2, Bottom-1 from groups of 5
+- **4 Pre-defined Bosses**: Михайло Рогальський, Олег Гороховський, Олександр Дубілет, Вадім Ковальов
+- **CSV Import**: Import managers from CSV with fields (ИНН, ФИО, ІПН лида, Лид для джира, Категория персонала)
+- **Real-time Scoring**: Points calculation (+2, +1, 0, -1) with micro-matches
+- **Aggregate Results**: Combined rankings with stability metrics
+- **Export to CSV**: Download results for further analysis
+
+## 🛠 Tech Stack
+
+- **Next.js 15** with App Router
+- **TypeScript** for type safety
+- **Vercel Postgres** for database
+- **Pure SQL** queries (no ORM)
+- **CSS Modules** for styling
+
+## 🚀 Quick Start
+
+### Local Development
 
 ```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Add your database URL
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Deploy to Vercel
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Push to GitHub
+2. Import to Vercel
+3. Connect Vercel Postgres
+4. Deploy!
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📊 Database Schema
 
-## Learn More
+- **bosses**: Pre-defined evaluators
+- **managers**: Imported from CSV
+- **tournaments**: Tournament settings
+- **appearances**: Track group memberships
+- **picks**: Store Top-1/Top-2/Bottom-1 selections
+- **scores**: Calculated points and metrics
 
-To learn more about Next.js, take a look at the following resources:
+## 🎮 How to Use
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Admin: Create Tournament
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Go to `/admin`
+2. Enter tournament title
+3. Upload CSV with managers
+4. Get tournament ID
 
-## Deploy on Vercel
+### Boss: Evaluate
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Go to homepage
+2. Enter tournament ID
+3. Select yourself from boss list
+4. Complete 3 rounds of evaluation
+5. View results
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📁 Project Structure
+
+```
+ready2build-tournament/
+├── app/
+│   ├── page.tsx           # Welcome page
+│   ├── admin/             # Admin panel
+│   ├── play/              # Evaluation interface
+│   ├── results/           # Results display
+│   └── api/               # API routes
+├── lib/
+│   ├── db.ts              # Database client
+│   ├── swiss.ts           # Swiss pairing logic
+│   ├── scoring.ts         # Points calculation
+│   └── types.ts           # TypeScript types
+└── styles/
+    └── globals.css        # Global styles
+```
+
+## 🔧 API Endpoints
+
+- `POST /api/seed` - Create tournament and import managers
+- `POST /api/groups` - Generate Swiss groups
+- `POST /api/pick` - Save evaluation choices
+- `GET /api/scores` - Get tournament results
+- `GET /api/export` - Export results to CSV
+
+## 📈 Scoring System
+
+- **Top-1**: +2 points, 4 wins
+- **Top-2**: +1 point, 3 wins, 1 loss
+- **Middle**: 0 points, 1 win, 2 losses
+- **Bottom-1**: -1 point, 4 losses
+
+## 🏁 Tiebreakers
+
+1. Strength of Schedule (SOS)
+2. Head-to-head results
+3. Top-1 count
+4. Bottom-1 count (less is better)
+
+---
+
+Built with ❤️ for efficient manager evaluation
