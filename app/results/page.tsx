@@ -40,6 +40,7 @@ export default function ResultsPage() {
     if (tournamentId) {
       loadScores();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournamentId]);
 
   const loadScores = async () => {
@@ -172,7 +173,7 @@ export default function ResultsPage() {
       </div>
       
       <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-        <a href="/" className="button secondary">
+        <a href="/" className="button secondary" style={{ display: 'inline-block', textDecoration: 'none' }}>
           Повернутися на головну
         </a>
       </div>

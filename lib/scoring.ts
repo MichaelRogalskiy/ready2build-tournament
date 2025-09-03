@@ -1,5 +1,5 @@
 import { sql } from './db';
-import { Score, ManagerScore } from './types';
+import { ManagerScore } from './types';
 
 export interface PickScores {
   [managerId: string]: {

@@ -1,5 +1,5 @@
 import { sql } from '@vercel/postgres';
-import { Boss, Manager, Tournament } from './types';
+import { Boss } from './types';
 
 export async function initDatabase() {
   const schemaSQL = `

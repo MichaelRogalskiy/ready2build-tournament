@@ -59,19 +59,21 @@ export default function PlayPage() {
       loadManagers();
       loadGroups();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournamentId, bossId, currentRound]);
 
   useEffect(() => {
     if (groups.length > 0 && managers.length > 0) {
       loadCurrentGroup();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups, managers, currentGroupIndex]);
 
   const fetchBossId = async (bossName: string) => {
     try {
       const response = await fetch('/api/bosses');
       const bosses = await response.json();
-      const boss = bosses.find((b: any) => b.name === bossName);
+      const boss = bosses.find((b: { id: string; name: string }) => b.name === bossName);
       if (boss) {
         setBossId(boss.id);
       }

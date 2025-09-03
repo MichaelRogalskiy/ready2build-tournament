@@ -8,7 +8,7 @@ export default function AdminPage() {
   const [rounds, setRounds] = useState(3);
   const [groupSize, setGroupSize] = useState(5);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{ tournamentId: string; managersCount: number; bossesCount: number; message: string } | null>(null);
   const [error, setError] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,7 +184,7 @@ export default function AdminPage() {
       </div>
       
       <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-        <a href="/" className="button secondary">
+        <a href="/" className="button secondary" style={{ display: 'inline-block', textDecoration: 'none' }}>
           Повернутися на головну
         </a>
       </div>
