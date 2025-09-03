@@ -9,6 +9,18 @@ export async function POST(request: NextRequest) {
   try {
     console.log('=== Seed endpoint called ===');
     
+    // Check environment variables first
+    if (!process.env.POSTGRES_URL && !process.env.POSTGRES_PRISMA_URL) {
+      console.error('No database URL found in environment variables');
+      return NextResponse.json({
+        error: 'Database not configured',
+        details: 'No POSTGRES_URL or POSTGRES_PRISMA_URL found',
+        suggestion: 'Make sure Vercel Postgres is connected to your project'
+      }, { status: 500 });
+    }
+    
+    console.log('Database URL configured:', !!process.env.POSTGRES_URL);
+    
     // Parse request body - now only need title, rounds, groupSize
     const body = await request.json();
     console.log('Request body:', body);
@@ -132,10 +144,34 @@ export async function POST(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Seed error:', error);
-    return NextResponse.json(
-      { error: 'Failed to seed database', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    console.error('=== SEED ERROR ===');
+    console.error('Error:', error);
+    console.error('Stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    // Check if it's a database connection error
+    if (error instanceof Error) {
+      if (error.message.includes('connect') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json({
+          error: 'Database connection failed',
+          details: error.message,
+          suggestion: 'Check if Vercel Postgres is properly connected'
+        }, { status: 500 });
+      }
+      
+      if (error.message.includes('does not exist') || error.message.includes('relation')) {
+        return NextResponse.json({
+          error: 'Database schema error',
+          details: error.message,
+          suggestion: 'Database tables may not be created properly'
+        }, { status: 500 });
+      }
+    }
+    
+    return NextResponse.json({
+      error: 'Failed to seed database',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      type: error instanceof Error ? error.constructor.name : typeof error,
+      stack: error instanceof Error ? error.stack : undefined
+    }, { status: 500 });
   }
 }
