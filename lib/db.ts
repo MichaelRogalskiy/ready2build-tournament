@@ -2,11 +2,12 @@ import { sql } from '@vercel/postgres';
 import { Boss } from './types';
 
 export async function initDatabase() {
+  console.log('Starting database initialization...');
   const schemaSQL = `
     -- Босси (оцінювачі)
     create table if not exists bosses (
       id uuid primary key default gen_random_uuid(),
-      name text not null,
+      name text not null unique,
       email text unique,
       token text unique,
       created_at timestamptz default now()
@@ -77,9 +78,19 @@ export async function initDatabase() {
     .filter(s => s.trim())
     .map(s => s.trim() + ';');
 
-  for (const statement of statements) {
-    await sql.query(statement);
+  for (let i = 0; i < statements.length; i++) {
+    const statement = statements[i];
+    console.log(`Executing statement ${i + 1}/${statements.length}`);
+    try {
+      await sql.query(statement);
+    } catch (error) {
+      console.error(`Error executing statement ${i + 1}:`, error);
+      console.error('Statement was:', statement);
+      throw error;
+    }
   }
+  
+  console.log('Database initialization completed successfully');
 }
 
 export async function seedBosses(): Promise<Boss[]> {
@@ -90,27 +101,38 @@ export async function seedBosses(): Promise<Boss[]> {
     'Вадім Ковальов'
   ];
 
+  console.log('Seeding bosses:', bossNames);
   const bosses: Boss[] = [];
   
   for (const name of bossNames) {
-    const result = await sql<Boss>`
-      INSERT INTO bosses (name)
-      VALUES (${name})
-      ON CONFLICT (name) DO NOTHING
-      RETURNING *
-    `;
-    
-    if (result.rows.length > 0) {
-      bosses.push(result.rows[0]);
-    } else {
-      const existing = await sql<Boss>`
-        SELECT * FROM bosses WHERE name = ${name}
+    console.log(`Processing boss: ${name}`);
+    try {
+      const result = await sql<Boss>`
+        INSERT INTO bosses (name)
+        VALUES (${name})
+        ON CONFLICT (name) DO NOTHING
+        RETURNING *
       `;
-      if (existing.rows.length > 0) {
-        bosses.push(existing.rows[0]);
+      
+      if (result.rows.length > 0) {
+        console.log(`Boss created: ${name}`);
+        bosses.push(result.rows[0]);
+      } else {
+        console.log(`Boss already exists, fetching: ${name}`);
+        const existing = await sql<Boss>`
+          SELECT * FROM bosses WHERE name = ${name}
+        `;
+        if (existing.rows.length > 0) {
+          bosses.push(existing.rows[0]);
+        }
       }
+    } catch (error) {
+      console.error(`Error processing boss ${name}:`, error);
+      throw error;
     }
   }
+  
+  console.log('Bosses seeded successfully:', bosses.length);
   
   return bosses;
 }

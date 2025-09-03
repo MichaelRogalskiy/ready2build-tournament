@@ -3,11 +3,16 @@ import { sql, initDatabase, seedBosses } from '@/lib/db';
 import { Manager, Tournament } from '@/lib/types';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { parseCSV } from '@/lib/csv';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== Seed endpoint called ===');
+    
     // Parse request body - now only need title, rounds, groupSize
     const body = await request.json();
+    console.log('Request body:', body);
+    
     const title = body.title;
     const rounds = Number(body.rounds || 3);
     const groupSize = Number(body.groupSize || 5);
@@ -19,12 +24,17 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    console.log('Initializing database...');
     // Initialize database schema
     await initDatabase();
+    console.log('Database initialized successfully');
     
+    console.log('Seeding bosses...');
     // Seed bosses
     const bosses = await seedBosses();
+    console.log('Bosses seeded:', bosses.length);
     
+    console.log('Creating tournament...');
     // Create tournament
     const tournamentResult = await sql<Tournament>`
       INSERT INTO tournaments (title, rounds, group_size)
@@ -32,23 +42,36 @@ export async function POST(request: NextRequest) {
       RETURNING *
     `;
     const tournament = tournamentResult.rows[0];
+    console.log('Tournament created:', tournament.id);
     
     // Read CSV from local file
     const csvPath = path.join(process.cwd(), 'List of managers.csv');
+    console.log('Reading CSV from:', csvPath);
     let csvContent: string;
     
     try {
       csvContent = await fs.readFile(csvPath, 'utf-8');
+      console.log('CSV file read successfully, size:', csvContent.length, 'characters');
     } catch (error) {
       console.error('Error reading CSV file:', error);
       return NextResponse.json(
-        { error: 'CSV file not found. Make sure "List of managers.csv" exists in project root.' },
+        { error: `CSV file not found at ${csvPath}. Make sure "List of managers.csv" exists in project root.` },
         { status: 400 }
       );
     }
     
-    const lines = csvContent.split('\n').filter(line => line.trim());
-    const headers = lines[0].split(',').map(h => h.trim());
+    const csvRows = parseCSV(csvContent);
+    console.log('CSV rows found:', csvRows.length);
+    
+    if (csvRows.length === 0) {
+      return NextResponse.json(
+        { error: 'CSV file is empty' },
+        { status: 400 }
+      );
+    }
+    
+    const headers = csvRows[0].map(h => h.trim());
+    console.log('CSV headers:', headers);
     
     // Expected headers
     const expectedHeaders = ['ИНН', 'ФИО', 'ІПН лида', 'Лид для джира', 'Категория персонала'];
@@ -59,31 +82,47 @@ export async function POST(request: NextRequest) {
       const index = headers.findIndex(h => h === expectedHeader);
       if (index !== -1) {
         headerMap[expectedHeader] = index;
+      } else {
+        console.log(`Header "${expectedHeader}" not found in CSV`);
       }
     });
+    console.log('Header mapping:', headerMap);
     
     // Process managers
+    console.log('Processing managers...');
     const managers: Manager[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim());
+    for (let i = 1; i < csvRows.length; i++) {
+      const values = csvRows[i].map(v => v.trim());
       
       const fio = values[headerMap['ФИО']] || '';
-      if (!fio) continue; // Skip empty rows
+      if (!fio) {
+        console.log(`Skipping row ${i}: no ФИО`);
+        continue;
+      }
       
-      const managerResult = await sql<Manager>`
-        INSERT INTO managers (inn, fio, lead_tin, lead_for_jira, staff_category)
-        VALUES (
-          ${values[headerMap['ИНН']] || null},
-          ${fio},
-          ${values[headerMap['ІПН лида']] || null},
-          ${values[headerMap['Лид для джира']] || null},
-          ${values[headerMap['Категория персонала']] || null}
-        )
-        RETURNING *
-      `;
+      console.log(`Processing manager ${i}: ${fio}`);
       
-      managers.push(managerResult.rows[0]);
+      try {
+        const managerResult = await sql<Manager>`
+          INSERT INTO managers (inn, fio, lead_tin, lead_for_jira, staff_category)
+          VALUES (
+            ${values[headerMap['ИНН']] || null},
+            ${fio},
+            ${values[headerMap['ІПН лида']] || null},
+            ${values[headerMap['Лид для джира']] || null},
+            ${values[headerMap['Категория персонала']] || null}
+          )
+          RETURNING *
+        `;
+        
+        managers.push(managerResult.rows[0]);
+      } catch (error) {
+        console.error(`Error inserting manager ${fio}:`, error);
+        throw error;
+      }
     }
+    
+    console.log('Managers processed:', managers.length);
     
     return NextResponse.json({
       tournamentId: tournament.id,
