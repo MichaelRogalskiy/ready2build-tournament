@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -28,7 +28,7 @@ interface BossScores {
   }>;
 }
 
-export default function ResultsPage() {
+function ResultsContent() {
   const searchParams = useSearchParams();
   const tournamentId = searchParams.get('tournamentId');
   
@@ -179,5 +179,19 @@ export default function ResultsPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={
+      <div className="container">
+        <div className="card">
+          <h1 className="title">Завантаження результатів...</h1>
+        </div>
+      </div>
+    }>
+      <ResultsContent />
+    </Suspense>
   );
 }
