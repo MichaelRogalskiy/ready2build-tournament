@@ -72,10 +72,17 @@ export default function PlayPage() {
   const fetchBossId = async (bossName: string) => {
     try {
       const response = await fetch('/api/bosses');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const bosses = await response.json();
+      console.log('Available bosses:', bosses);
       const boss = bosses.find((b: { id: string; name: string }) => b.name === bossName);
       if (boss) {
+        console.log('Found boss:', boss);
         setBossId(boss.id);
+      } else {
+        console.error('Boss not found:', bossName);
       }
     } catch (error) {
       console.error('Error fetching boss ID:', error);
@@ -85,7 +92,11 @@ export default function PlayPage() {
   const loadManagers = async () => {
     try {
       const response = await fetch('/api/managers');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
+      console.log('Loaded managers:', data.length, 'managers');
       setManagers(data);
     } catch (error) {
       console.error('Error loading managers:', error);
@@ -93,7 +104,12 @@ export default function PlayPage() {
   };
 
   const loadGroups = async () => {
-    if (!bossId) return;
+    if (!bossId) {
+      console.log('No boss ID, skipping groups load');
+      return;
+    }
+    
+    console.log('Loading groups for:', { tournamentId, bossId, roundIndex: currentRound });
     
     try {
       const response = await fetch('/api/groups', {
@@ -105,7 +121,13 @@ export default function PlayPage() {
           roundIndex: currentRound
         })
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('Groups response:', data);
       setGroups(data.groups || []);
     } catch (error) {
       console.error('Error loading groups:', error);
@@ -113,16 +135,27 @@ export default function PlayPage() {
   };
 
   const loadCurrentGroup = () => {
+    console.log('Loading current group:', { 
+      groupIndex: currentGroupIndex, 
+      totalGroups: groups.length,
+      managersCount: managers.length 
+    });
+    
     const currentGroup = groups[currentGroupIndex];
     if (currentGroup) {
+      console.log('Current group:', currentGroup);
       const groupManagers = currentGroup.memberIds
         .map(id => managers.find(m => m.id === id))
         .filter(Boolean) as Manager[];
+      
+      console.log('Group managers:', groupManagers);
       
       // Randomize order for display
       const shuffled = [...groupManagers].sort(() => Math.random() - 0.5);
       setCurrentManagers(shuffled);
       setStartTime(Date.now());
+    } else {
+      console.log('No current group found');
     }
   };
 
@@ -202,6 +235,21 @@ export default function PlayPage() {
         
         <div style={{ marginBottom: '2rem' }}>
           <h3 style={{ marginBottom: '1rem' }}>Оберіть менеджерів:</h3>
+          
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <p>Завантаження менеджерів...</p>
+            </div>
+          )}
+          
+          {currentManagers.length === 0 && !loading && (
+            <div style={{ textAlign: 'center', padding: '2rem', background: '#f5f5f5', borderRadius: '8px' }}>
+              <p>Менеджери не завантажились. Перевірте консоль браузера для деталей.</p>
+              <p>Турнір: {tournamentId}</p>
+              <p>Бос: {selectedBoss}</p>
+              <p>Бос ID: {bossId}</p>
+            </div>
+          )}
           
           {currentManagers.map((manager) => (
             <div
